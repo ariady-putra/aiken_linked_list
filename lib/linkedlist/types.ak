@@ -1,7 +1,7 @@
-use aiken/hash.{Blake2b_224, Hash}
-use aiken/transaction.{OutputReference}
-use aiken/transaction/credential.{Address, VerificationKey}
-use aiken/transaction/value.{AssetName, PolicyId, Value}
+use aiken/crypto.{VerificationKeyHash}
+use cardano/address.{Address}
+use cardano/assets.{AssetName, PolicyId, Value}
+use cardano/transaction.{OutputReference}
 
 /// A number of milliseconds since 00:00:00 UTC on 1 January 1970.
 pub type POSIXTime =
@@ -12,9 +12,6 @@ pub type AssetClass {
   asset_name: AssetName,
 }
 
-pub type PubKeyHash =
-  Hash<Blake2b_224, VerificationKey>
-
 pub type Config {
   init_utxo: OutputReference,
   deadline: POSIXTime,
@@ -22,7 +19,7 @@ pub type Config {
 }
 
 pub type NodeKey {
-  Key { key: PubKeyHash }
+  Key { key: VerificationKeyHash }
   Empty
 }
 
@@ -46,6 +43,6 @@ pub type Common {
 pub type NodeAction {
   Init
   Deinit
-  Insert { key_to_insert: PubKeyHash, covering_node: SetNode }
-  Remove { key_to_remove: PubKeyHash, covering_node: SetNode }
+  Insert { key_to_insert: VerificationKeyHash, covering_node: SetNode }
+  Remove { key_to_remove: VerificationKeyHash, covering_node: SetNode }
 }
