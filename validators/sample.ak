@@ -16,6 +16,7 @@ use linkedlist/types.{
   Config, Deinit, Empty, Init, Insert, Key, NodeAction, Remove, SetNode,
 }
 use linkedlist/utils
+use time_util/time.{Day, Hour, add_time}
 use tx_util/builder/txn.{
   add_asset_to_tx_output, add_mint, add_signatory, add_tx_input, add_tx_output,
   set_datum_of_tx_input, set_datum_of_tx_output, set_id, set_validity_range,
@@ -79,7 +80,7 @@ test mint_validator_init(
   ) via fuzzer.tuple6(
     script_hash_fuzzer(),
     output_reference_fuzzer(),
-    fuzz.int_at_least(1000),
+    fuzz.int_at_least(86400000),
     address_fuzzer(
       FromScript(Specified(mock_script_hash("P"))),
       WithFuzzedDelegation,
@@ -95,7 +96,11 @@ test mint_validator_init(
   ),
 ) {
   let config =
-    Config { init_utxo: init_output_ref, deadline: now * 4, penalty_address }
+    Config {
+      init_utxo: init_output_ref,
+      deadline: now |> add_time(1 |> Day),
+      penalty_address,
+    }
 
   let datum = SetNode { key: Empty, next: Empty }
   let redeemer = Init
@@ -139,7 +144,11 @@ test mint_validator_deinit(
   ),
 ) {
   let config =
-    Config { init_utxo: init_output_ref, deadline: now * 4, penalty_address }
+    Config {
+      init_utxo: init_output_ref,
+      deadline: now |> add_time(1 |> Day),
+      penalty_address,
+    }
 
   let datum = SetNode { key: Empty, next: Empty }
   let redeemer = Deinit
@@ -183,7 +192,11 @@ test mint_validator_deinit_fails_on_non_empty(
 
   expect [init_output_ref, remove_output_ref] = o_refs
   let config =
-    Config { init_utxo: init_output_ref, deadline: now * 4, penalty_address }
+    Config {
+      init_utxo: init_output_ref,
+      deadline: now |> add_time(1 |> Day),
+      penalty_address,
+    }
 
   let remove_node =
     SetNode { key: Key { key: user_pkh }, next: Key { key: user_pkh } }
@@ -232,7 +245,11 @@ test mint_validator_insert(
 
   expect [init_output_ref, covering_output_ref] = o_refs
   let config =
-    Config { init_utxo: init_output_ref, deadline: now * 4, penalty_address }
+    Config {
+      init_utxo: init_output_ref,
+      deadline: now |> add_time(1 |> Day),
+      penalty_address,
+    }
 
   let covering_minted_value = own_cs |> assets.from_asset(covering_tn, 1)
 
@@ -265,7 +282,8 @@ test mint_validator_insert(
 
   let redeemer = Insert { key_to_insert: user2_pkh, covering_node }
 
-  let insert_timerange = interval.entirely_between(now, now * 2)
+  let insert_timerange =
+    interval.entirely_between(now, now |> add_time(2 |> Hour))
 
   let tx =
     transaction.placeholder
@@ -302,7 +320,11 @@ test mint_validator_remove(
 
   expect [init_output_ref, covering_output_ref, remove_output_ref] = o_refs
   let config =
-    Config { init_utxo: init_output_ref, deadline: now * 4, penalty_address }
+    Config {
+      init_utxo: init_output_ref,
+      deadline: now |> add_time(1 |> Day),
+      penalty_address,
+    }
 
   let covering_minted_value = own_cs |> assets.from_asset(covering_tn, 1)
 
@@ -338,7 +360,8 @@ test mint_validator_remove(
 
   let redeemer = Remove { key_to_remove: user2_pkh, covering_node: output_node }
 
-  let remove_timerange = interval.entirely_between(now, now * 2)
+  let remove_timerange =
+    interval.entirely_between(now, now |> add_time(2 |> Hour))
 
   let tx =
     transaction.placeholder
