@@ -80,7 +80,7 @@ test mint_validator_init(
   ) via fuzzer.tuple6(
     script_hash_fuzzer(),
     output_reference_fuzzer(),
-    fuzz.int_at_least(86400000),
+    fuzz.int_at_least(86_400_000),
     address_fuzzer(
       FromScript(Specified(mock_script_hash("P"))),
       WithFuzzedDelegation,
@@ -132,7 +132,7 @@ test mint_validator_deinit(
   (own_cs, init_output_ref, now, penalty_address, contract_address) via fuzzer.tuple5(
     script_hash_fuzzer(),
     output_reference_fuzzer(),
-    fuzz.int_at_least(1000),
+    fuzz.int_at_least(86_400_000),
     address_fuzzer(
       FromScript(Specified(mock_script_hash("P"))),
       WithFuzzedDelegation,
@@ -176,7 +176,7 @@ test mint_validator_deinit_fails_on_non_empty(
   (blake2b_224s, o_refs, now, penalty_address, contract_address) via fuzzer.tuple5(
     blake2b_224_fuzzer(count: 2),
     fuzz.set_between(output_reference_fuzzer(), 2, 2),
-    fuzz.int_at_least(1000),
+    fuzz.int_at_least(86_400_000),
     address_fuzzer(
       FromScript(Specified(mock_script_hash("P"))),
       WithFuzzedDelegation,
@@ -203,7 +203,7 @@ test mint_validator_deinit_fails_on_non_empty(
 
   let user_value = own_cs |> assets.from_asset(user_tn, 1)
 
-  let remove_node_output =
+  let remove_node_input =
     txn.new_tx_input(remove_output_ref, contract_address)
       |> set_datum_of_tx_input(remove_node |> InlineDatum)
       |> with_asset_of_tx_input(9_000_000 |> assets.from_lovelace)
@@ -216,18 +216,93 @@ test mint_validator_deinit_fails_on_non_empty(
 
   let tx =
     transaction.placeholder
-      |> add_tx_input(remove_node_output)
+      |> add_tx_input(remove_node_input)
       |> add_mint(burn_value)
   let tx_hash = tx |> cbor.serialise |> crypto.blake2b_256
 
   config |> mint_validator.mint(redeemer, own_cs, tx |> set_id(tx_hash))
 }
 
-test mint_validator_insert(
+test mint_validator_first_insert(
+  (blake2b_224s, o_refs, now, penalty_address, contract_address) via fuzzer.tuple5(
+    blake2b_224_fuzzer(count: 2),
+    fuzz.set_between(output_reference_fuzzer(), 2, 2),
+    fuzz.int_at_least(86_400_000),
+    address_fuzzer(
+      FromScript(Specified(mock_script_hash("P"))),
+      WithFuzzedDelegation,
+    ),
+    address_fuzzer(
+      FromScript(Specified(mock_script_hash("I"))),
+      WithFuzzedDelegation,
+    ),
+  ),
+) {
+  expect [own_cs, user_pkh] = blake2b_224s
+  let insert_tn = constants.set_node_prefix |> bytearray.concat(user_pkh)
+
+  expect [init_output_ref, head_output_ref] = o_refs
+  let config =
+    Config {
+      init_utxo: init_output_ref,
+      deadline: now |> add_time(1 |> Day),
+      penalty_address,
+    }
+
+  let datum = SetNode { key: Empty, next: Empty }
+
+  let head_node_value =
+    own_cs |> assets.from_asset(constants.origin_node_token_name, 1)
+
+  // head is the current covering node input
+  let head_input =
+    txn.new_tx_input(head_output_ref, contract_address)
+      |> set_datum_of_tx_input(datum |> InlineDatum)
+      |> with_asset_of_tx_input(4_000_000 |> assets.from_lovelace)
+      |> with_asset_of_tx_input(head_node_value)
+
+  let out_prev_node = SetNode { ..datum, next: Key { key: user_pkh } }
+
+  // prev_node will be the head
+  let out_prev_node_output =
+    txn.new_tx_output(contract_address)
+      |> set_datum_of_tx_output(out_prev_node |> InlineDatum)
+      |> add_asset_to_tx_output(4_000_000 |> assets.from_lovelace)
+      |> add_asset_to_tx_output(head_node_value)
+
+  let out_node = SetNode { key: Key { key: user_pkh }, next: Empty }
+
+  let insert_minted_value = own_cs |> assets.from_asset(insert_tn, 1)
+
+  let out_node_output =
+    txn.new_tx_output(contract_address)
+      |> set_datum_of_tx_output(out_node |> InlineDatum)
+      |> add_asset_to_tx_output(9_000_000 |> assets.from_lovelace)
+      |> add_asset_to_tx_output(insert_minted_value)
+
+  let redeemer = Insert { key_to_insert: user_pkh, covering_node: datum }
+
+  let insert_timerange =
+    interval.entirely_between(now, now |> add_time(2 |> Hour))
+
+  let tx =
+    transaction.placeholder
+      |> set_validity_range(insert_timerange)
+      |> add_tx_input(head_input)
+      |> add_tx_output(out_prev_node_output)
+      |> add_tx_output(out_node_output)
+      |> add_mint(insert_minted_value)
+      |> add_signatory(user_pkh)
+  let tx_hash = tx |> cbor.serialise |> crypto.blake2b_256
+
+  config |> mint_validator.mint(redeemer, own_cs, tx |> set_id(tx_hash))
+}
+
+test mint_validator_subsequent_insert(
   (blake2b_224s, o_refs, now, penalty_address, contract_address) via fuzzer.tuple5(
     blake2b_224_fuzzer(count: 3),
     fuzz.set_between(output_reference_fuzzer(), 2, 2),
-    fuzz.int_at_least(1000),
+    fuzz.int_at_least(86_400_000),
     address_fuzzer(
       FromScript(Specified(mock_script_hash("P"))),
       WithFuzzedDelegation,
@@ -258,7 +333,7 @@ test mint_validator_insert(
 
   let covering_node = SetNode { key: Key { key: user1_pkh }, next: Empty }
 
-  let covering_output =
+  let covering_input =
     txn.new_tx_input(covering_output_ref, contract_address)
       |> set_datum_of_tx_input(covering_node |> InlineDatum)
       |> with_asset_of_tx_input(covering_node_value)
@@ -288,7 +363,7 @@ test mint_validator_insert(
   let tx =
     transaction.placeholder
       |> set_validity_range(insert_timerange)
-      |> add_tx_input(covering_output)
+      |> add_tx_input(covering_input)
       |> add_tx_output(out_prev_node_output)
       |> add_tx_output(out_node_output)
       |> add_mint(insert_minted_value)
@@ -302,7 +377,7 @@ test mint_validator_remove(
   (blake2b_224s, o_refs, now, penalty_address, contract_address) via fuzzer.tuple5(
     blake2b_224_fuzzer(count: 3),
     fuzz.set_between(output_reference_fuzzer(), 3, 3),
-    fuzz.int_at_least(1000),
+    fuzz.int_at_least(86_400_000),
     address_fuzzer(
       FromScript(Specified(mock_script_hash("P"))),
       WithFuzzedDelegation,
@@ -334,7 +409,7 @@ test mint_validator_remove(
   let covering_node =
     SetNode { key: Key { key: user1_pkh }, next: Key { key: user2_pkh } }
 
-  let covering_output =
+  let covering_input =
     txn.new_tx_input(covering_output_ref, contract_address)
       |> set_datum_of_tx_input(covering_node |> InlineDatum)
       |> with_asset_of_tx_input(covering_node_value)
@@ -343,7 +418,7 @@ test mint_validator_remove(
 
   let user2_value = assets.from_asset(own_cs, user2_tn, 1)
 
-  let remove_node_output =
+  let remove_node_input =
     txn.new_tx_input(remove_output_ref, contract_address)
       |> set_datum_of_tx_input(remove_node |> InlineDatum)
       |> with_asset_of_tx_input(9_000_000 |> assets.from_lovelace)
@@ -366,11 +441,88 @@ test mint_validator_remove(
   let tx =
     transaction.placeholder
       |> set_validity_range(remove_timerange)
-      |> add_tx_input(remove_node_output)
-      |> add_tx_input(covering_output)
+      |> add_tx_input(remove_node_input)
+      |> add_tx_input(covering_input)
       |> add_tx_output(out_node_output)
       |> add_mint(remove_burn_value)
       |> add_signatory(user2_pkh)
+  let tx_hash = tx |> cbor.serialise |> crypto.blake2b_256
+
+  config |> mint_validator.mint(redeemer, own_cs, tx |> set_id(tx_hash))
+}
+
+test mint_validator_remove_last(
+  (blake2b_224s, o_refs, now, penalty_address, contract_address) via fuzzer.tuple5(
+    blake2b_224_fuzzer(count: 2),
+    fuzz.set_between(output_reference_fuzzer(), 3, 3),
+    fuzz.int_at_least(86_400_000),
+    address_fuzzer(
+      FromScript(Specified(mock_script_hash("P"))),
+      WithFuzzedDelegation,
+    ),
+    address_fuzzer(
+      FromScript(Specified(mock_script_hash("I"))),
+      WithFuzzedDelegation,
+    ),
+  ),
+) {
+  expect [own_cs, user_pkh] = blake2b_224s
+  let user_tn = constants.set_node_prefix |> bytearray.concat(user_pkh)
+
+  expect [init_output_ref, covering_output_ref, remove_output_ref] = o_refs
+  let config =
+    Config {
+      init_utxo: init_output_ref,
+      deadline: now |> add_time(1 |> Day),
+      penalty_address,
+    }
+
+  let datum = SetNode { key: Empty, next: Key { key: user_pkh } }
+
+  let head_node_value =
+    own_cs |> assets.from_asset(constants.origin_node_token_name, 1)
+
+  // head is the current covering node input
+  let head_input =
+    txn.new_tx_input(covering_output_ref, contract_address)
+      |> set_datum_of_tx_input(datum |> InlineDatum)
+      |> with_asset_of_tx_input(4_000_000 |> assets.from_lovelace)
+      |> with_asset_of_tx_input(head_node_value)
+
+  let remove_node = SetNode { key: Key { key: user_pkh }, next: Empty }
+
+  let user_value = assets.from_asset(own_cs, user_tn, 1)
+
+  let remove_node_input =
+    txn.new_tx_input(remove_output_ref, contract_address)
+      |> set_datum_of_tx_input(remove_node |> InlineDatum)
+      |> with_asset_of_tx_input(9_000_000 |> assets.from_lovelace)
+      |> with_asset_of_tx_input(user_value)
+
+  let output_node = SetNode { ..datum, next: Empty }
+
+  // head will be the last node; you can deinit afterward
+  let out_node_output =
+    txn.new_tx_output(contract_address)
+      |> set_datum_of_tx_output(output_node |> InlineDatum)
+      |> add_asset_to_tx_output(4_000_000 |> assets.from_lovelace)
+      |> add_asset_to_tx_output(head_node_value)
+
+  let remove_burn_value = own_cs |> assets.from_asset(user_tn, -1)
+
+  let redeemer = Remove { key_to_remove: user_pkh, covering_node: output_node }
+
+  let remove_timerange =
+    interval.entirely_between(now, now |> add_time(2 |> Hour))
+
+  let tx =
+    transaction.placeholder
+      |> set_validity_range(remove_timerange)
+      |> add_tx_input(remove_node_input)
+      |> add_tx_input(head_input)
+      |> add_tx_output(out_node_output)
+      |> add_mint(remove_burn_value)
+      |> add_signatory(user_pkh)
   let tx_hash = tx |> cbor.serialise |> crypto.blake2b_256
 
   config |> mint_validator.mint(redeemer, own_cs, tx |> set_id(tx_hash))
