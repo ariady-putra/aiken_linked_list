@@ -43,6 +43,18 @@ pub type Common {
 pub type NodeAction {
   Init
   Deinit
-  Insert { key_to_insert: VerificationKeyHash, covering_node: SetNode }
-  Remove { key_to_remove: VerificationKeyHash, covering_node: SetNode }
+  Insert {
+    key_to_insert: VerificationKeyHash,
+    /// | Covering node **INPUT**, ie. the datum **before** transaction |
+    /// |---------------------------------------------------------------------|
+    /// | <img src="https://raw.githubusercontent.com/ariady-putra/aiken_linked_list/refs/heads/main/assets/images/covering-node-insert.png"/> |
+    covering_node: SetNode,
+  }
+  Remove {
+    key_to_remove: VerificationKeyHash,
+    /// | Covering node **OUTPUT**, ie. the datum **after** transaction |
+    /// |---------------------------------------------------------------------|
+    /// | <img src="https://raw.githubusercontent.com/ariady-putra/aiken_linked_list/refs/heads/main/assets/images/covering-node-remove.png"/> |
+    covering_node: SetNode,
+  }
 }

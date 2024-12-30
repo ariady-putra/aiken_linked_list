@@ -21,8 +21,13 @@ version = "2.1.0"
 source = "github"
 
 [[dependencies]]
-name = "aiken-extra/tx_util"
-version = "2.220.202412"
+name = "ariady-putra/tx_util"
+version = "main"
+source = "github"
+
+[[dependencies]]
+name = "aiken-extra/fuzz_util"
+version = "main"
 source = "github"
 
 [config]
