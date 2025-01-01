@@ -22,17 +22,17 @@ source = "github"
 
 [[dependencies]]
 name = "aiken-extra/fuzz_util"
-version = "main"
+version = "1.220.202501"
 source = "github"
 
 [[dependencies]]
-name = "ariady-putra/time_util"
-version = "main"
+name = "aiken-extra/time_util"
+version = "6.220.202501"
 source = "github"
 
 [[dependencies]]
-name = "ariady-putra/tx_util"
-version = "main"
+name = "aiken-extra/tx_util"
+version = "3.220.202501"
 source = "github"
 
 [config]
