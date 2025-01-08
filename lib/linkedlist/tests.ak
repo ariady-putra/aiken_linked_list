@@ -1,13 +1,13 @@
 use aiken/fuzz
-use fuzz_util/fuzzer
 use linkedlist/utils
+use test_kit/fuzzy
 
 fn not_zero(i: Int) -> Bool {
   i != 0
 }
 
 test div_ceil_prop(
-  (a, b) via fuzzer.tuple(fuzz.int(), fuzz.such_that(fuzz.int(), not_zero)),
+  (a, b) via fuzzy.tuple(fuzz.int(), fuzz.such_that(fuzz.int(), not_zero)),
 ) {
   utils.div_ceil(a, b) == a / b + if a % b == 0 {
     0
