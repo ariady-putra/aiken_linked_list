@@ -22,7 +22,7 @@ source = "github"
 
 [[dependencies]]
 name = "aiken-extra/test_kit"
-version = "hydrogen"
+version = "helium"
 source = "github"
 
 [config]
